@@ -19,8 +19,17 @@ sql = connection.cursor()
 # num (TEXT) - номер телефона пользователя
 # latitude (REAL) - широта геолокации пользователя (добавлено)
 # longitude (REAL) - долгота геолокации пользователя (добавлено)
+# language (TEXT) - предпочтительный язык пользователя (добавлено, по умолчанию 'ru')
 sql.execute('CREATE TABLE IF NOT EXISTS users '
-            '(tg_id INTEGER, name TEXT, num TEXT, latitude REAL, longitude REAL);')
+            '(tg_id INTEGER, name TEXT, num TEXT, latitude REAL, longitude REAL, language TEXT DEFAULT "ru");')
+
+# Если таблица уже существует, но столбца 'language' нет, добавьте его
+try:
+    sql.execute("ALTER TABLE users ADD COLUMN language TEXT DEFAULT 'ru';")
+    connection.commit()
+except sqlite3.OperationalError:
+    # Столбец уже существует, игнорируем ошибку
+    pass
 
 # Создание таблицы продуктов
 # Выполняем SQL-запрос для создания таблицы 'products' (продуктов).
@@ -52,12 +61,12 @@ sql.execute('CREATE TABLE IF NOT EXISTS cart '
 ## Методы пользователя ##
 # Регистрация
 # Определяем функцию register для добавления нового пользователя в таблицу 'users'.
-# Теперь функция принимает также latitude и longitude.
-def register(tg_id, name, num, latitude=None, longitude=None):
+# Теперь функция принимает также latitude, longitude и language.
+def register(tg_id, name, num, latitude=None, longitude=None, language='ru'):
     # Выполняем SQL-запрос для вставки новой записи в таблицу 'users'.
-    # Добавлены плейсхолдеры для latitude и longitude.
-    sql.execute('INSERT INTO users VALUES(?, ?, ?, ?, ?);',
-                (tg_id, name, num, latitude, longitude))
+    # Добавлены плейсхолдеры для latitude, longitude и language.
+    sql.execute('INSERT INTO users VALUES(?, ?, ?, ?, ?, ?);',
+                (tg_id, name, num, latitude, longitude, language))
     # Фиксация изменений
     # Сохраняем (коммитим) все изменения, сделанные в базе данных, чтобы они стали постоянными.
     connection.commit()
@@ -76,17 +85,23 @@ def check_user(tg_id):
 
 # Функция для получения данных профиля пользователя
 def get_user_profile(tg_id):
-    # Выбираем имя, номер, широту и долготу для данного пользователя
-    result = sql.execute('SELECT name, num, latitude, longitude FROM users WHERE tg_id=?;', (tg_id,)).fetchone()
+    # Выбираем имя, номер, широту, долготу и язык для данного пользователя
+    result = sql.execute('SELECT name, num, latitude, longitude, language FROM users WHERE tg_id=?;', (tg_id,)).fetchone()
     if result:
         # Возвращаем данные в виде словаря для удобства
         return {
             'name': result[0],
             'num': result[1],
             'latitude': result[2],
-            'longitude': result[3]
+            'longitude': result[3],
+            'language': result[4]
         }
     else:
         return None # Возвращаем None, если пользователь не найден
+
+# Новая функция для обновления языка пользователя
+def update_user_language(tg_id, language):
+    sql.execute('UPDATE users SET language=? WHERE tg_id=?;', (language, tg_id))
+    connection.commit()
 
 # Функция get_user_location была удалена, так как она больше не используется.
